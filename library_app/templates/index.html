@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Management System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1>📚 Library Management System</h1>
+            <p>Manage your book collection with ease</p>
+        </div>
+    </header>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="main-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-card">
+                <h3>📊 Statistics</h3>
+                <div class="stat-item">
+                    <span class="stat-icon">📚</span>
+                    <div class="stat-label">Total Books</div>
+                    <div class="stat-value">{{ stats.total }}</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">✅</span>
+                    <div class="stat-label">Available</div>
+                    <div class="stat-value">{{ stats.available }}</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">📖</span>
+                    <div class="stat-label">Borrowed</div>
+                    <div class="stat-value">{{ stats.borrowed }}</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+        <!-- Add New Book Section -->
+        <section class="card">
+            <h2>➕ Add New Book</h2>
+            <form action="{{ url_for('add_book') }}" method="post" enctype="multipart/form-data" class="form-grid">
+                <div class="form-group">
+                    <label for="title">Book Title</label>
+                    <input type="text" id="title" name="title" placeholder="Enter book title" required>
+                </div>
+                <div class="form-group">
+                    <label for="author">Author</label>
+                    <input type="text" id="author" name="author" placeholder="Enter author name" required>
+                </div>
+                <div class="form-group">
+                    <label for="image">Book Cover Image (Optional)</label>
+                    <input type="file" id="image" name="image" accept="image/*" onchange="previewImage(this)">
+                    <div id="image-preview" class="image-preview" style="display: none;">
+                        <img id="preview-img" src="" alt="Preview" style="max-width: 100px; max-height: 100px; border-radius: 8px; margin-top: 8px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Add Book</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Search Books Section -->
+        <section class="card">
+            <h2>🔍 Search Books</h2>
+            <form action="{{ url_for('check_book') }}" method="post" class="form-grid">
+                <div class="form-group">
+                    <label for="query">Search by Title</label>
+                    <input type="text" id="query" name="query" placeholder="Type book title or keywords" required>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Search Results Section -->
+        {% if search_results %}
+        <section class="card search-results">
+            <h2>📖 Search Results</h2>
+            <div class="books-grid">
+                {% for book in search_results %}
+                <div class="book-card">
+                    <div class="book-image">
+                        {% if book.image_path %}
+                            <img src="{{ url_for('static', filename=book.image_path) }}" alt="{{ book.title }}" style="width: 100%; height: 100%; object-fit: cover;">
+                        {% else %}
+                            <!-- Book cover placeholder -->
+                        {% endif %}
+                    </div>
+                    <div class="book-content">
+                        <h3 class="book-title">{{ book.title }}</h3>
+                        <p class="book-author">by {{ book.author }}</p>
+                        <div class="book-status">
+                            <span class="status-badge {% if book.available %}status-available{% else %}status-borrowed{% endif %}">
+                                {% if book.available %}Available{% else %}Borrowed{% endif %}
+                            </span>
+                        </div>
+                        <div class="book-actions">
+                            {% if book.available %}
+                                <form action="{{ url_for('borrow_book', book_id=book.id) }}" method="post" style="display: inline;">
+                                    <button type="submit" class="btn btn-success btn-sm">Borrow</button>
+                                </form>
+                            {% else %}
+                                <form action="{{ url_for('return_book', book_id=book.id) }}" method="post" style="display: inline;">
+                                    <button type="submit" class="btn btn-warning btn-sm">Return</button>
+                                </form>
+                            {% endif %}
+                            <form action="{{ url_for('delete_book', book_id=book.id) }}" method="post" style="display: inline;" onsubmit="return confirmDelete('{{ book.title }}')">
+                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- All Books Section -->
+        <section class="card">
+            <h2>📚 All Books ({{ books|length }})</h2>
+            {% if books %}
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Author</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for book in books %}
+                            <tr>
+                                <td>{{ book.id }}</td>
+                                <td>
+                                    <strong>{{ book.title }}</strong>
+                                </td>
+                                <td>{{ book.author }}</td>
+                                <td>
+                                    <span class="status-badge {% if book.available %}status-available{% else %}status-borrowed{% endif %}">
+                                        {% if book.available %}Available{% else %}Borrowed{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="table-actions">
+                                        {% if book.available %}
+                                            <form action="{{ url_for('borrow_book', book_id=book.id) }}" method="post" style="display: inline;">
+                                                <button type="submit" class="btn btn-success btn-sm">Borrow</button>
+                                            </form>
+                                        {% else %}
+                                            <form action="{{ url_for('return_book', book_id=book.id) }}" method="post" style="display: inline;">
+                                                <button type="submit" class="btn btn-warning btn-sm">Return</button>
+                                            </form>
+                                        {% endif %}
+                                        <form action="{{ url_for('delete_book', book_id=book.id) }}" method="post" style="display: inline;" onsubmit="return confirmDelete('{{ book.title }}')">
+                                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="no-results">
+                    <div class="no-results-icon">📚</div>
+                    <h3>No books in your library yet</h3>
+                    <p class="text-muted">Add your first book using the form above to get started!</p>
+                </div>
+            {% endif %}
+        </section>
+        </main>
+    </div>
+
+    <!-- External JavaScript -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <script>
+        // Add loading state to forms
+        document.querySelectorAll('form').forEach(function(form) {
+            form.addEventListener('submit', function() {
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.innerHTML = '<span class="loading"></span> Processing...';
+                    submitBtn.disabled = true;
+                }
+            });
+        });
+
+        // Image preview functionality
+        function previewImage(input) {
+            const preview = document.getElementById('image-preview');
+            const previewImg = document.getElementById('preview-img');
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        // Delete confirmation functionality
+        function confirmDelete(bookTitle) {
+            return confirm(`Are you sure you want to delete "${bookTitle}"?\n\nThis action cannot be undone and will also delete the associated image file if it exists.`);
+        }
+    </script>
+</body>
+</html>
